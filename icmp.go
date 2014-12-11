@@ -48,10 +48,23 @@ func ipv4Payload(b []byte) []byte {
 }
 
 const (
-	icmpv4EchoRequest = 8
-	icmpv4EchoReply   = 0
-	icmpv6EchoRequest = 128
-	icmpv6EchoReply   = 129
+	icmpv4EchoReply     = 0
+	icmpv4UnReach       = 3
+	icmpv4SourceQuench  = 4
+	icmpv4Redirect      = 5
+	icmpv4EchoRequest   = 8
+	icmpv4RouteAdvert   = 9
+	icmpv4RouterSolicit = 10
+	icmpv4TimeExceeded  = 11
+	icmpv4ParamProb     = 12
+	icmpv4Tstamp        = 13
+	icmpv4TstampReply   = 14
+	icmpv4IReq          = 15
+	icmpv4IReqReply     = 16
+	icmpv4MaskReq       = 17
+	icmpv4MaskReply     = 18
+	icmpv6EchoRequest   = 128
+	icmpv6EchoReply     = 129
 )
 
 // icmpMessage represents an ICMP message.

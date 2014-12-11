@@ -118,11 +118,14 @@ type Pinger struct {
 	// the library calls an idle callback function. It is also used for an
 	// interval time of RunLoop() method
 	MaxRTT time.Duration
+	// Listen IP address
+	ListenAddr *net.IPAddr
 	// OnRecv is called with a response packet's source address and its
 	// elapsed time when Pinger receives a response packet.
 	OnRecv func(*net.IPAddr, time.Duration)
 	// OnIdle is called when MaxRTT time passed
 	OnIdle func()
+	OnErr  func(*net.IPAddr, int)
 	// If Debug is true, it prints debug messages to stdout.
 	Debug bool
 }
@@ -286,7 +289,7 @@ func (p *Pinger) Err() error {
 }
 
 func (p *Pinger) listen(netProto string) *net.IPConn {
-	conn, err := net.ListenIP(netProto, nil)
+	conn, err := net.ListenIP(netProto, p.ListenAddr)
 	if err != nil {
 		p.mu.Lock()
 		p.ctx.err = err
@@ -497,14 +500,6 @@ func (p *Pinger) recvICMP(conn *net.IPConn, recv chan<- *packet, ctx *context, w
 }
 
 func (p *Pinger) procRecv(recv *packet, queue map[string]*net.IPAddr) {
-	addr := recv.addr.String()
-	p.mu.Lock()
-	if _, ok := p.addrs[addr]; !ok {
-		p.mu.Unlock()
-		return
-	}
-	p.mu.Unlock()
-
 	var bytes []byte
 	if isIPv4(recv.addr.IP) {
 		bytes = ipv4Payload(recv.bytes)
@@ -521,6 +516,11 @@ func (p *Pinger) procRecv(recv *packet, queue map[string]*net.IPAddr) {
 	}
 
 	if m.Type != icmpv4EchoReply && m.Type != icmpv6EchoReply {
+		// Ignore echo requests
+		if m.Type != icmpv4EchoRequest && m.Type != icmpv6EchoRequest {
+			p.debugf("procRecv : %v", m.Type)
+			p.OnErr(recv.addr, m.Type)
+		}
 		return
 	}
 
@@ -536,14 +536,11 @@ func (p *Pinger) procRecv(recv *packet, queue map[string]*net.IPAddr) {
 		return
 	}
 
-	if _, ok := queue[addr]; ok {
-		delete(queue, addr)
-		p.mu.Lock()
-		handler := p.OnRecv
-		p.mu.Unlock()
-		if handler != nil {
-			handler(recv.addr, rtt)
-		}
+	p.mu.Lock()
+	handler := p.OnRecv
+	p.mu.Unlock()
+	if handler != nil {
+		handler(recv.addr, rtt)
 	}
 }
 
